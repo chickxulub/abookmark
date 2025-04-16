@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Bookmark Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.4/wavesurfer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.4/plugin/wavesurfer.markers.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        #waveform {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        input[type="text"] {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            width: 200px;
+        }
+        #bookmarks {
+            margin-top: 30px;
+        }
+        .bookmark-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .bookmark-item:hover {
+            background-color: #f9f9f9;
+        }
+        .time {
+            color: #666;
+            min-width: 80px;
+        }
+        .delete-btn {
+            background: #f44336;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .delete-btn:hover {
+            background: #d32f2f;
+        }
+        #share-section {
+            margin-top: 30px;
+            padding: 15px;
+            background: #f0f7ff;
+            border-radius: 4px;
+        }
+        #share-url {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+            box-sizing: border-box;
+        }
+        #file-input {
+            display: none;
+        }
+        .file-upload {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .file-upload:hover {
+            background: #0b7dda;
+        }
+        .selected-file {
+            margin-left: 10px;
+            font-style: italic;
+        }
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Audio Bookmark Tool</h1>
+    
+    <div class="controls">
+        <label class="file-upload" for="file-input">
+            Choose Audio File
+        </label>
+        <input type="file" id="file-input" accept="audio/*">
+        <span class="selected-file" id="file-name">No file selected</span>
+    </div>
+    
+    <div id="waveform"></div>
+    
+    <div class="controls">
+        <button id="play-pause">Play</button>
+        <button id="add-bookmark">Add Bookmark</button>
+        <input type="text" id="bookmark-text" placeholder="Bookmark description">
+    </div>
+    
+    <div id="bookmarks">
+        <h2>Bookmarks</h2>
+        <div id="bookmarks-list"></div>
+    </div>
+    
+    <div id="share-section">
+        <h2>Share with Collaborators</h2>
+        <p>Copy this link to share with your collaborators:</p>
+        <input type="text" id="share-url" readonly>
+        <button id="copy-url">Copy Link</button>
+    </div>
+    
+    <div class="instructions">
+        <h3>How to use:</h3>
+        <ol>
+            <li>Upload your audio file using the "Choose Audio File" button</li>
+            <li>Play the audio and click "Add Bookmark" at important points</li>
+            <li>Add a description for each bookmark</li>
+            <li>Share the link with your collaborators</li>
+            <li>They can click on any bookmark to jump to that position in the audio</li>
+        </ol>
+    </div>
+
+    <script>
+        let wavesurfer;
+        let bookmarks = [];
+        
+        // Initialize WaveSurfer
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create WaveSurfer instance
+            wavesurfer = WaveSurfer.create({
+                container: '#waveform',
+                waveColor: '#4CAF50',
+                progressColor: '#2E7D32',
+                height: 100,
+                responsive: true,
+                plugins: [
+                    WaveSurfer.markers.create({
+                        markers: []
+                    })
+                ]
+            });
+            
+            // Load bookmarks from URL parameters if any
+            loadFromUrl();
+            
+            // Update play/pause button text
+            wavesurfer.on('play', function() {
+                document.getElementById('play-pause').textContent = 'Pause';
+            });
+            
+            wavesurfer.on('pause', function() {
+                document.getElementById('play-pause').textContent = 'Play';
+            });
+            
+            // Play/Pause button
+            document.getElementById('play-pause').addEventListener('click', function() {
+                wavesurfer.playPause();
+            });
+            
+            // File input
+            document.getElementById('file-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    document.getElementById('file-name').textContent = file.name;
+                    const fileUrl = URL.createObjectURL(file);
+                    wavesurfer.load(fileUrl);
+                    
+                    // Clear existing bookmarks if loading a new file
+                    if (!window.location.search) {
+                        bookmarks = [];
+                        updateBookmarksList();
+                    }
+                }
+            });
+            
+            // Add bookmark button
+            document.getElementById('add-bookmark').addEventListener('click', function() {
+                addBookmark();
+            });
+            
+            // Copy share URL button
+            document.getElementById('copy-url').addEventListener('click', function() {
+                const shareUrl = document.getElementById('share-url');
+                shareUrl.select();
+                document.execCommand('copy');
+                this.textContent = 'Copied!';
+                setTimeout(() => {
+                    this.textContent = 'Copy Link';
+                }, 2000);
+            });
+        });
+        
+        // Add a bookmark at the current time
+        function addBookmark() {
+            if (!wavesurfer || !wavesurfer.isReady) return;
+            
+            const currentTime = wavesurfer.getCurrentTime();
+            const description = document.getElementById('bookmark-text').value || `Bookmark ${bookmarks.length + 1}`;
+            
+            const bookmark = {
+                time: currentTime,
+                description: description,
+                id: Date.now().toString()
+            };
+            
+            bookmarks.push(bookmark);
+            
+            // Add marker to wavesurfer
+            wavesurfer.markers.add({
+                time: currentTime,
+                label: description,
+                color: '#ff0000',
+                position: 'top'
+            });
+            
+            // Update bookmarks list and share URL
+            updateBookmarksList();
+            updateShareUrl();
+            
+            // Clear input
+            document.getElementById('bookmark-text').value = '';
+        }
+        
+        // Update the bookmarks list in DOM
+        function updateBookmarksList() {
+            const bookmarksList = document.getElementById('bookmarks-list');
+            bookmarksList.innerHTML = '';
+            
+            if (bookmarks.length === 0) {
+                bookmarksList.innerHTML = '<p>No bookmarks yet. Add some by clicking the "Add Bookmark" button.</p>';
+                return;
+            }
+            
+            bookmarks.sort((a, b) => a.time - b.time).forEach(bookmark => {
+                const bookmarkItem = document.createElement('div');
+                bookmarkItem.className = 'bookmark-item';
+                
+                const timeFormatted = formatTime(bookmark.time);
+                
+                bookmarkItem.innerHTML = `
+                    <span class="time">${timeFormatted}</span>
+                    <span class="description">${bookmark.description}</span>
+                    <button class="delete-btn" data-id="${bookmark.id}">Delete</button>
+                `;
+                
+                // Jump to time when clicking on bookmark
+                bookmarkItem.addEventListener('click', function(e) {
+                    if (!e.target.classList.contains('delete-btn')) {
+                        wavesurfer.seekTo(bookmark.time / wavesurfer.getDuration());
+                    }
+                });
+                
+                bookmarksList.appendChild(bookmarkItem);
+            });
+            
+            // Add delete event listeners
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const id = this.getAttribute('data-id');
+                    deleteBookmark(id);
+                });
+            });
+        }
+        
+        // Delete a bookmark
+        function deleteBookmark(id) {
+            const index = bookmarks.findIndex(b => b.id === id);
+            if (index > -1) {
+                const bookmark = bookmarks[index];
+                bookmarks.splice(index, 1);
+                
+                // Remove marker from wavesurfer
+                wavesurfer.markers.remove();
+                const remainingMarkers = bookmarks.map(b => ({
+                    time: b.time,
+                    label: b.description,
+                    color: '#ff0000',
+                    position: 'top'
+                }));
+                wavesurfer.markers.add(remainingMarkers);
+                
+                // Update UI
+                updateBookmarksList();
+                updateShareUrl();
+            }
+        }
+        
+        // Format time as MM:SS.ms
+        function formatTime(time) {
+            const minutes = Math.floor(time / 60);
+            const seconds = Math.floor(time % 60);
+            const ms = Math.floor((time % 1) * 100);
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+        
+        // Update share URL
+        function updateShareUrl() {
+            if (bookmarks.length === 0) {
+                document.getElementById('share-url').value = '';
+                return;
+            }
+            
+            const bookmarksParam = encodeURIComponent(JSON.stringify(bookmarks));
+            const url = `${window.location.origin}${window.location.pathname}?bookmarks=${bookmarksParam}`;
+            document.getElementById('share-url').value = url;
+        }
+        
+        // Load bookmarks from URL
+        function loadFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const bookmarksParam = urlParams.get('bookmarks');
+            
+            if (bookmarksParam) {
+                try {
+                    bookmarks = JSON.parse(decodeURIComponent(bookmarksParam));
+                    
+                    // Add markers for each bookmark
+                    wavesurfer.on('ready', function() {
+                        const markers = bookmarks.map(b => ({
+                            time: b.time,
+                            label: b.description,
+                            color: '#ff0000',
+                            position: 'top'
+                        }));
+                        wavesurfer.markers.add(markers);
+                        updateBookmarksList();
+                        updateShareUrl();
+                    });
+                } catch (e) {
+                    console.error('Error parsing bookmarks from URL', e);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
