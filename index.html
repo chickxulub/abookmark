@@ -18,6 +18,10 @@
             color: #333;
             margin-bottom: 30px;
         }
+        h2 {
+            margin-top: 25px;
+            color: #444;
+        }
         #waveform {
             margin: 20px 0;
             border: 1px solid #ddd;
@@ -64,17 +68,18 @@
         }
         .bookmark-item:hover {
             background-color: #f9f9f9;
+            cursor: pointer;
         }
         .time {
             color: #666;
             min-width: 80px;
         }
-        .delete-btn {
+        .button-small {
             background: #f44336;
             padding: 4px 8px;
             font-size: 12px;
         }
-        .delete-btn:hover {
+        .button-small:hover {
             background: #d32f2f;
         }
         #share-section {
@@ -89,7 +94,7 @@
             margin-top: 10px;
             box-sizing: border-box;
         }
-        #file-input {
+        #file-input, #bookmark-file-input {
             display: none;
         }
         .file-upload {
@@ -113,29 +118,187 @@
             background: #f9f9f9;
             border-radius: 4px;
         }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background: white;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        #url-input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .loading-indicator {
+            display: none;
+            margin-left: 10px;
+            color: #666;
+        }
+        .error-message {
+            color: #f44336;
+            margin-top: 10px;
+            display: none;
+        }
+        .success-message {
+            color: #4CAF50;
+            margin-top: 10px;
+            display: none;
+        }
+        .bookmark-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .bookmark-file-info {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        /* Cloud storage provider pills */
+        .provider-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .provider-pill {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+        }
+        .provider-pill.active {
+            background: #2196F3;
+            color: white;
+            border-color: #2196F3;
+        }
+        .provider-pill:hover {
+            background: #f1f1f1;
+        }
+        .provider-pill.active:hover {
+            background: #0b7dda;
+        }
     </style>
 </head>
 <body>
     <h1>Audio Bookmark Tool</h1>
     
-    <div class="controls">
-        <label class="file-upload" for="file-input">
-            Choose Audio File
-        </label>
-        <input type="file" id="file-input" accept="audio/*">
-        <span class="selected-file" id="file-name">No file selected</span>
+    <div class="tabs">
+        <div class="tab active" data-tab="local">Local File</div>
+        <div class="tab" data-tab="url">Cloud Storage URL</div>
+    </div>
+    
+    <div class="tab-content active" id="local-tab">
+        <div class="controls">
+            <label class="file-upload" for="file-input">
+                Choose Audio File
+            </label>
+            <input type="file" id="file-input" accept="audio/*">
+            <span class="selected-file" id="file-name">No file selected</span>
+        </div>
+    </div>
+    
+    <div class="tab-content" id="url-tab">
+        <div class="provider-pills">
+            <div class="provider-pill active" data-provider="all">All Services</div>
+            <div class="provider-pill" data-provider="gdrive">Google Drive</div>
+            <div class="provider-pill" data-provider="dropbox">Dropbox</div>
+            <div class="provider-pill" data-provider="mediafire">MediaFire</div>
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="url-input" placeholder="Paste your cloud storage link here">
+            <button id="load-url">Load Audio</button>
+            <span class="loading-indicator" id="loading">Loading...</span>
+        </div>
+        
+        <div class="error-message" id="url-error">
+            Could not load audio from this URL. Please check that it's a valid link and try again.
+        </div>
+        
+        <div class="instructions">
+            <p><strong id="provider-instructions-title">How to get a direct download URL:</strong></p>
+            
+            <div id="gdrive-instructions">
+                <p><strong>Google Drive:</strong></p>
+                <ol>
+                    <li>Upload your audio file to Google Drive</li>
+                    <li>Right-click the file and select "Share"</li>
+                    <li>Set permissions to "Anyone with the link"</li>
+                    <li>Copy the link and paste it here</li>
+                    <li>Our app will automatically convert it to a direct download link</li>
+                </ol>
+            </div>
+            
+            <div id="dropbox-instructions">
+                <p><strong>Dropbox:</strong></p>
+                <ol>
+                    <li>Upload your audio file to Dropbox</li>
+                    <li>Click "Share" and create a shared link</li>
+                    <li>Copy the link</li>
+                    <li>You can paste it directly here, or</li>
+                    <li>For better compatibility, change '?dl=0' to '?dl=1' at the end of the URL</li>
+                </ol>
+            </div>
+            
+            <div id="mediafire-instructions">
+                <p><strong>MediaFire:</strong></p>
+                <ol>
+                    <li>Open your file on MediaFire</li>
+                    <li>Right-click on the download button</li>
+                    <li>Select "Copy link address" or "Copy link"</li>
+                    <li>Paste the link here</li>
+                </ol>
+            </div>
+        </div>
     </div>
     
     <div id="waveform"></div>
     
     <div class="controls">
-        <button id="play-pause">Play</button>
-        <button id="add-bookmark">Add Bookmark</button>
+        <button id="play-pause" disabled>Play</button>
+        <button id="add-bookmark" disabled>Add Bookmark</button>
         <input type="text" id="bookmark-text" placeholder="Bookmark description">
     </div>
     
     <div id="bookmarks">
         <h2>Bookmarks</h2>
+        <div class="bookmark-buttons">
+            <label class="file-upload" for="bookmark-file-input">
+                Import Bookmarks
+            </label>
+            <input type="file" id="bookmark-file-input" accept=".json">
+            <button id="export-bookmarks">Export Bookmarks</button>
+            <button id="clear-bookmarks">Clear All</button>
+        </div>
+        <div class="bookmark-file-info" id="bookmark-file-info"></div>
+        <div class="success-message" id="bookmark-success">Bookmarks imported successfully!</div>
         <div id="bookmarks-list"></div>
     </div>
     
@@ -149,17 +312,19 @@
     <div class="instructions">
         <h3>How to use:</h3>
         <ol>
-            <li>Upload your audio file using the "Choose Audio File" button</li>
+            <li>Upload your audio file or use a cloud storage link</li>
             <li>Play the audio and click "Add Bookmark" at important points</li>
             <li>Add a description for each bookmark</li>
-            <li>Share the link with your collaborators</li>
-            <li>They can click on any bookmark to jump to that position in the audio</li>
+            <li>Share the link with your collaborators or export bookmarks for later use</li>
+            <li>Click on any bookmark to jump to that position in the audio</li>
         </ol>
     </div>
 
     <script>
         let wavesurfer;
         let bookmarks = [];
+        let currentAudioUrl = '';
+        let currentAudioFileName = '';
         
         // Initialize WaveSurfer
         document.addEventListener('DOMContentLoaded', function() {
@@ -180,6 +345,18 @@
             // Load bookmarks from URL parameters if any
             loadFromUrl();
             
+            // Enable controls when audio is ready
+            wavesurfer.on('ready', function() {
+                document.getElementById('play-pause').disabled = false;
+                document.getElementById('add-bookmark').disabled = false;
+                document.getElementById('loading').style.display = 'none';
+                
+                // Apply any bookmarks that were loaded from URL or file
+                if (bookmarks.length > 0) {
+                    applyBookmarks();
+                }
+            });
+            
             // Update play/pause button text
             wavesurfer.on('play', function() {
                 document.getElementById('play-pause').textContent = 'Pause';
@@ -187,6 +364,12 @@
             
             wavesurfer.on('pause', function() {
                 document.getElementById('play-pause').textContent = 'Play';
+            });
+            
+            // Handle errors
+            wavesurfer.on('error', function() {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('url-error').style.display = 'block';
             });
             
             // Play/Pause button
@@ -199,20 +382,94 @@
                 const file = e.target.files[0];
                 if (file) {
                     document.getElementById('file-name').textContent = file.name;
+                    currentAudioFileName = file.name;
                     const fileUrl = URL.createObjectURL(file);
-                    wavesurfer.load(fileUrl);
-                    
-                    // Clear existing bookmarks if loading a new file
-                    if (!window.location.search) {
-                        bookmarks = [];
-                        updateBookmarksList();
-                    }
+                    loadAudio(fileUrl, file.name);
+                }
+            });
+            
+            // URL input
+            document.getElementById('load-url').addEventListener('click', function() {
+                const url = document.getElementById('url-input').value.trim();
+                if (url) {
+                    loadAudioFromUrl(url);
                 }
             });
             
             // Add bookmark button
             document.getElementById('add-bookmark').addEventListener('click', function() {
                 addBookmark();
+            });
+            
+            // Bookmark import
+            document.getElementById('bookmark-file-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const importedBookmarks = JSON.parse(e.target.result);
+                            if (Array.isArray(importedBookmarks)) {
+                                bookmarks = importedBookmarks;
+                                document.getElementById('bookmark-file-info').textContent = `Imported ${bookmarks.length} bookmarks from ${file.name}`;
+                                document.getElementById('bookmark-success').style.display = 'block';
+                                setTimeout(() => {
+                                    document.getElementById('bookmark-success').style.display = 'none';
+                                }, 3000);
+                                
+                                // Apply bookmarks if audio is loaded
+                                if (wavesurfer.isReady) {
+                                    applyBookmarks();
+                                }
+                                
+                                updateBookmarksList();
+                                updateShareUrl();
+                            }
+                        } catch (error) {
+                            console.error('Error importing bookmarks:', error);
+                            document.getElementById('url-error').textContent = 'Invalid bookmark file format';
+                            document.getElementById('url-error').style.display = 'block';
+                            setTimeout(() => {
+                                document.getElementById('url-error').style.display = 'none';
+                            }, 3000);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            });
+            
+            // Bookmark export
+            document.getElementById('export-bookmarks').addEventListener('click', function() {
+                if (bookmarks.length === 0) {
+                    alert('No bookmarks to export. Add some bookmarks first.');
+                    return;
+                }
+                
+                const bookmarksJson = JSON.stringify(bookmarks, null, 2);
+                const blob = new Blob([bookmarksJson], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                const filename = currentAudioFileName ? 
+                    `bookmarks_${currentAudioFileName.replace(/\.[^/.]+$/, '')}.json` : 
+                    'audio_bookmarks.json';
+                
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            
+            // Clear bookmarks
+            document.getElementById('clear-bookmarks').addEventListener('click', function() {
+                if (confirm('Are you sure you want to clear all bookmarks?')) {
+                    bookmarks = [];
+                    wavesurfer.markers.clear();
+                    updateBookmarksList();
+                    updateShareUrl();
+                }
             });
             
             // Copy share URL button
@@ -225,7 +482,194 @@
                     this.textContent = 'Copy Link';
                 }, 2000);
             });
+            
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Update tabs
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update content
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    document.getElementById(tabId + '-tab').classList.add('active');
+                });
+            });
+            
+            // Provider pill selection
+            document.querySelectorAll('.provider-pill').forEach(pill => {
+                pill.addEventListener('click', function() {
+                    const provider = this.getAttribute('data-provider');
+                    
+                    // Update active state
+                    document.querySelectorAll('.provider-pill').forEach(p => p.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show/hide instructions based on selection
+                    if (provider === 'all') {
+                        document.getElementById('gdrive-instructions').style.display = 'block';
+                        document.getElementById('dropbox-instructions').style.display = 'block';
+                        document.getElementById('mediafire-instructions').style.display = 'block';
+                    } else {
+                        document.getElementById('gdrive-instructions').style.display = provider === 'gdrive' ? 'block' : 'none';
+                        document.getElementById('dropbox-instructions').style.display = provider === 'dropbox' ? 'block' : 'none';
+                        document.getElementById('mediafire-instructions').style.display = provider === 'mediafire' ? 'block' : 'none';
+                    }
+                    
+                    // Update placeholder text
+                    const input = document.getElementById('url-input');
+                    if (provider === 'gdrive') {
+                        input.placeholder = 'Paste Google Drive link here';
+                    } else if (provider === 'dropbox') {
+                        input.placeholder = 'Paste Dropbox link here';
+                    } else if (provider === 'mediafire') {
+                        input.placeholder = 'Paste MediaFire link here';
+                    } else {
+                        input.placeholder = 'Paste your cloud storage link here';
+                    }
+                });
+            });
+            
+            // Trigger click on 'all' pill to initialize
+            document.querySelector('.provider-pill[data-provider="all"]').click();
         });
+        
+        // Load audio from URL (Any cloud storage)
+        function loadAudioFromUrl(url) {
+            document.getElementById('loading').style.display = 'inline';
+            document.getElementById('url-error').style.display = 'none';
+            document.getElementById('play-pause').disabled = true;
+            document.getElementById('add-bookmark').disabled = true;
+            
+            // CORS proxy to use for all services
+            const corsProxyUrl = 'https://corsproxy.io/?';
+            
+            // Extract filename from URL
+            const urlFilename = extractFilenameFromUrl(url);
+            currentAudioFileName = urlFilename;
+            
+            // Check if it's a Google Drive URL
+            if (url.includes('drive.google.com')) {
+                let fileId = '';
+                
+                // Extract file ID from various Google Drive URL formats
+                if (url.includes('/file/d/')) {
+                    fileId = url.split('/file/d/')[1].split('/')[0];
+                } else if (url.includes('id=')) {
+                    fileId = url.split('id=')[1].split('&')[0];
+                }
+                
+                if (fileId) {
+                    // Create direct download URL
+                    const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                    loadAudio(corsProxyUrl + encodeURIComponent(directUrl), urlFilename);
+                } else {
+                    showError('Invalid Google Drive URL. Please make sure you copied the link correctly.');
+                }
+            }
+            // Check if it's a Dropbox URL
+            else if (url.includes('dropbox.com')) {
+                // Convert to direct download if needed
+                let directUrl = url;
+                if (url.includes('?dl=0')) {
+                    directUrl = url.replace('?dl=0', '?dl=1');
+                } else if (!url.includes('?dl=1')) {
+                    directUrl = url + '?dl=1';
+                }
+                
+                loadAudio(corsProxyUrl + encodeURIComponent(directUrl), urlFilename);
+            }
+            // Check if it's a MediaFire URL
+            else if (url.includes('mediafire.com')) {
+                // Convert to direct download link if possible
+                if (url.includes('download.mediafire.com')) {
+                    loadAudio(corsProxyUrl + encodeURIComponent(url), urlFilename);
+                } else {
+                    const directUrl = convertToMediafireDirectLink(url);
+                    loadAudio(corsProxyUrl + encodeURIComponent(directUrl), urlFilename);
+                }
+            }
+            // Handle other URLs
+            else {
+                loadAudio(corsProxyUrl + encodeURIComponent(url), urlFilename);
+            }
+        }
+        
+        // Convert MediaFire URL to direct download URL
+        function convertToMediafireDirectLink(url) {
+            // Convert to direct download URL when possible
+            if (url.includes('mediafire.com/file/')) {
+                return url.replace('mediafire.com/file/', 'mediafire.com/download/');
+            } else if (url.includes('mediafire.com/view/')) {
+                return url.replace('mediafire.com/view/', 'mediafire.com/download/');
+            }
+            return url;
+        }
+        
+        // Extract filename from URL
+        function extractFilenameFromUrl(url) {
+            try {
+                // Remove query parameters
+                const urlWithoutParams = url.split('?')[0];
+                // Get the last part of the path
+                const parts = urlWithoutParams.split('/');
+                const rawFilename = parts[parts.length - 1];
+                // Handle special cases
+                if (url.includes('drive.google.com')) {
+                    return 'google-drive-audio';
+                } else if (url.includes('dropbox.com')) {
+                    return rawFilename || 'dropbox-audio';
+                } else if (url.includes('mediafire.com')) {
+                    return rawFilename || 'mediafire-audio';
+                }
+                return rawFilename || 'audio-file';
+            } catch (e) {
+                return 'audio-file';
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            const errorEl = document.getElementById('url-error');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // Load audio file
+        function loadAudio(url, filename) {
+            currentAudioUrl = url;
+            
+            // Don't clear bookmarks if loading from a shared URL
+            if (!window.location.search) {
+                bookmarks = [];
+            }
+            
+            wavesurfer.load(url);
+            
+            // Update the audio URL parameter
+            updateShareUrl();
+        }
+        
+        // Apply bookmarks to the waveform
+        function applyBookmarks() {
+            // Clear existing markers
+            wavesurfer.markers.clear();
+            
+            // Add markers for each bookmark
+            if (bookmarks.length > 0) {
+                const markers = bookmarks.map(b => ({
+                    time: b.time,
+                    label: b.description,
+                    color: '#ff0000',
+                    position: 'top'
+                }));
+                wavesurfer.markers.add(markers);
+                updateBookmarksList();
+            }
+        }
         
         // Add a bookmark at the current time
         function addBookmark() {
@@ -277,12 +721,12 @@
                 bookmarkItem.innerHTML = `
                     <span class="time">${timeFormatted}</span>
                     <span class="description">${bookmark.description}</span>
-                    <button class="delete-btn" data-id="${bookmark.id}">Delete</button>
+                    <button class="button-small" data-id="${bookmark.id}">Delete</button>
                 `;
                 
                 // Jump to time when clicking on bookmark
                 bookmarkItem.addEventListener('click', function(e) {
-                    if (!e.target.classList.contains('delete-btn')) {
+                    if (!e.target.classList.contains('button-small')) {
                         wavesurfer.seekTo(bookmark.time / wavesurfer.getDuration());
                     }
                 });
@@ -291,7 +735,7 @@
             });
             
             // Add delete event listeners
-            document.querySelectorAll('.delete-btn').forEach(btn => {
+            document.querySelectorAll('.button-small').forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const id = this.getAttribute('data-id');
@@ -304,18 +748,11 @@
         function deleteBookmark(id) {
             const index = bookmarks.findIndex(b => b.id === id);
             if (index > -1) {
-                const bookmark = bookmarks[index];
                 bookmarks.splice(index, 1);
                 
-                // Remove marker from wavesurfer
-                wavesurfer.markers.remove();
-                const remainingMarkers = bookmarks.map(b => ({
-                    time: b.time,
-                    label: b.description,
-                    color: '#ff0000',
-                    position: 'top'
-                }));
-                wavesurfer.markers.add(remainingMarkers);
+                // Update markers
+                wavesurfer.markers.clear();
+                applyBookmarks();
                 
                 // Update UI
                 updateBookmarksList();
@@ -333,37 +770,37 @@
         
         // Update share URL
         function updateShareUrl() {
-            if (bookmarks.length === 0) {
+            const bookmarksParam = bookmarks.length > 0 ? `&bookmarks=${encodeURIComponent(JSON.stringify(bookmarks))}` : '';
+            const audioParam = currentAudioUrl && !currentAudioUrl.startsWith('blob:') ? 
+                `&audio=${encodeURIComponent(currentAudioUrl)}` : '';
+            
+            if (!bookmarksParam && !audioParam) {
                 document.getElementById('share-url').value = '';
                 return;
             }
             
-            const bookmarksParam = encodeURIComponent(JSON.stringify(bookmarks));
-            const url = `${window.location.origin}${window.location.pathname}?bookmarks=${bookmarksParam}`;
+            const url = `${window.location.origin}${window.location.pathname}?t=${Date.now()}${audioParam}${bookmarksParam}`;
             document.getElementById('share-url').value = url;
         }
         
-        // Load bookmarks from URL
+        // Load bookmarks and audio from URL
         function loadFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             const bookmarksParam = urlParams.get('bookmarks');
+            const audioParam = urlParams.get('audio');
+            
+            if (audioParam) {
+                // Switch to URL tab
+                document.querySelector('.tab[data-tab="url"]').click();
+                document.getElementById('url-input').value = decodeURIComponent(audioParam);
+                loadAudioFromUrl(decodeURIComponent(audioParam));
+            }
             
             if (bookmarksParam) {
                 try {
                     bookmarks = JSON.parse(decodeURIComponent(bookmarksParam));
-                    
-                    // Add markers for each bookmark
-                    wavesurfer.on('ready', function() {
-                        const markers = bookmarks.map(b => ({
-                            time: b.time,
-                            label: b.description,
-                            color: '#ff0000',
-                            position: 'top'
-                        }));
-                        wavesurfer.markers.add(markers);
-                        updateBookmarksList();
-                        updateShareUrl();
-                    });
+                    document.getElementById('bookmark-file-info').textContent = 
+                        `Loaded ${bookmarks.length} bookmarks from shared link`;
                 } catch (e) {
                     console.error('Error parsing bookmarks from URL', e);
                 }
