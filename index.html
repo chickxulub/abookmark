@@ -6,6 +6,7 @@
     <title>Audio Bookmark Tool</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.4/wavesurfer.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.4/plugin/wavesurfer.markers.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.4/plugin/wavesurfer.cursor.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,6 +27,7 @@
             margin: 20px 0;
             border: 1px solid #ddd;
             border-radius: 4px;
+            position: relative;
         }
         .controls {
             margin: 20px 0;
@@ -204,6 +206,38 @@
         .provider-pill.active:hover {
             background: #0b7dda;
         }
+        /* Time info display */
+        #current-time-display {
+            position: absolute;
+            left: 10px;
+            top: 5px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 3px 6px;
+            font-size: 12px;
+            border-radius: 3px;
+            z-index: 10;
+        }
+        #waveform-container {
+            position: relative;
+        }
+        /* Cursor customization */
+        .wavesurfer-cursor {
+            width: 1px !important;
+            background-color: #333 !important;
+            z-index: 2 !important;
+        }
+        /* Time label in cursor */
+        #wave-cursor-label {
+            padding: 2px 4px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 10px;
+            border-radius: 3px;
+            white-space: nowrap;
+            position: relative;
+            top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -279,7 +313,10 @@
         </div>
     </div>
     
-    <div id="waveform"></div>
+    <div id="waveform-container">
+        <div id="waveform"></div>
+        <div id="current-time-display">00:00.00 / 00:00.00</div>
+    </div>
     
     <div class="controls">
         <button id="play-pause" disabled>Play</button>
@@ -326,6 +363,16 @@
         let currentAudioUrl = '';
         let currentAudioFileName = '';
         
+        // Format time as MM:SS.ms
+        function formatTime(time) {
+            if (!time && time !== 0) return '00:00.00';
+            
+            const minutes = Math.floor(time / 60);
+            const seconds = Math.floor(time % 60);
+            const ms = Math.floor((time % 1) * 100);
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+        
         // Initialize WaveSurfer
         document.addEventListener('DOMContentLoaded', function() {
             // Create WaveSurfer instance
@@ -338,6 +385,20 @@
                 plugins: [
                     WaveSurfer.markers.create({
                         markers: []
+                    }),
+                    WaveSurfer.cursor.create({
+                        showTime: true,
+                        opacity: 1,
+                        customShowTimeStyle: {
+                            'background-color': 'rgba(0, 0, 0, 0.6)',
+                            'color': '#fff',
+                            'padding': '2px 4px',
+                            'font-size': '10px',
+                            'border-radius': '3px'
+                        },
+                        formatTimeCallback: function(cursorTime) {
+                            return formatTime(cursorTime);
+                        }
                     })
                 ]
             });
@@ -355,6 +416,9 @@
                 if (bookmarks.length > 0) {
                     applyBookmarks();
                 }
+                
+                // Initialize time display
+                updateTimeDisplay(0, wavesurfer.getDuration());
             });
             
             // Update play/pause button text
@@ -366,8 +430,19 @@
                 document.getElementById('play-pause').textContent = 'Play';
             });
             
+            // Update time display during playback
+            wavesurfer.on('audioprocess', function() {
+                updateTimeDisplay(wavesurfer.getCurrentTime(), wavesurfer.getDuration());
+            });
+            
+            // Update time display after seeking
+            wavesurfer.on('seek', function() {
+                updateTimeDisplay(wavesurfer.getCurrentTime(), wavesurfer.getDuration());
+            });
+            
             // Handle errors
-            wavesurfer.on('error', function() {
+            wavesurfer.on('error', function(e) {
+                console.error('WaveSurfer error:', e);
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('url-error').style.display = 'block';
             });
@@ -384,7 +459,23 @@
                     document.getElementById('file-name').textContent = file.name;
                     currentAudioFileName = file.name;
                     const fileUrl = URL.createObjectURL(file);
-                    loadAudio(fileUrl, file.name);
+                    
+                    // Reset UI elements
+                    document.getElementById('loading').style.display = 'inline';
+                    document.getElementById('play-pause').disabled = true;
+                    document.getElementById('add-bookmark').disabled = true;
+                    
+                    // Clear any previous error messages
+                    document.getElementById('url-error').style.display = 'none';
+                    
+                    // Check file type before loading
+                    if (file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|ogg|m4a|flac|aac)$/i)) {
+                        loadAudio(fileUrl, file.name);
+                    } else {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('url-error').textContent = 'Invalid file type. Please select an audio file.';
+                        document.getElementById('url-error').style.display = 'block';
+                    }
                 }
             });
             
@@ -536,6 +627,14 @@
             document.querySelector('.provider-pill[data-provider="all"]').click();
         });
         
+        // Update time display
+        function updateTimeDisplay(currentTime, totalTime) {
+            const timeDisplay = document.getElementById('current-time-display');
+            const currentFormatted = formatTime(currentTime);
+            const totalFormatted = formatTime(totalTime);
+            timeDisplay.textContent = `${currentFormatted} / ${totalFormatted}`;
+        }
+        
         // Load audio from URL (Any cloud storage)
         function loadAudioFromUrl(url) {
             document.getElementById('loading').style.display = 'inline';
@@ -647,10 +746,47 @@
                 bookmarks = [];
             }
             
-            wavesurfer.load(url);
-            
-            // Update the audio URL parameter
-            updateShareUrl();
+            try {
+                // Remove any previous error handlers to avoid duplicates
+                wavesurfer.un('error');
+                
+                // Add error handler before loading
+                wavesurfer.on('error', function(err) {
+                    console.error('Error loading audio:', err);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('url-error').textContent = 'Error loading audio file. Please try another file.';
+                    document.getElementById('url-error').style.display = 'block';
+                    
+                    // Re-enable buttons in case of error
+                    document.getElementById('play-pause').disabled = true;
+                    document.getElementById('add-bookmark').disabled = true;
+                });
+                
+                // Load the audio file with timeout
+                const loadTimeout = setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('url-error').textContent = 'Loading timed out. The file may be too large or unavailable.';
+                    document.getElementById('url-error').style.display = 'block';
+                }, 30000); // 30 second timeout
+                
+                wavesurfer.on('ready', function() {
+                    clearTimeout(loadTimeout);
+                });
+                
+                wavesurfer.load(url);
+                
+                // Update the audio URL parameter
+                updateShareUrl();
+            } catch (error) {
+                console.error('Exception loading audio:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('url-error').textContent = 'Error loading audio file. Please try another file.';
+                document.getElementById('url-error').style.display = 'block';
+                
+                // Re-enable buttons in case of error
+                document.getElementById('play-pause').disabled = true;
+                document.getElementById('add-bookmark').disabled = true;
+            }
         }
         
         // Apply bookmarks to the waveform
@@ -687,12 +823,12 @@
             bookmarks.push(bookmark);
             
             // Add marker to wavesurfer
-            wavesurfer.markers.add({
+            wavesurfer.markers.add([{
                 time: currentTime,
                 label: description,
                 color: '#ff0000',
                 position: 'top'
-            });
+            }]);
             
             // Update bookmarks list and share URL
             updateBookmarksList();
@@ -744,66 +880,56 @@
             });
         }
         
-        // Delete a bookmark
-        function deleteBookmark(id) {
-            const index = bookmarks.findIndex(b => b.id === id);
-            if (index > -1) {
-                bookmarks.splice(index, 1);
-                
-                // Update markers
-                wavesurfer.markers.clear();
-                applyBookmarks();
-                
-                // Update UI
-                updateBookmarksList();
-                updateShareUrl();
-            }
-        }
-        
-        // Format time as MM:SS.ms
-        function formatTime(time) {
-            const minutes = Math.floor(time / 60);
-            const seconds = Math.floor(time % 60);
-            const ms = Math.floor((time % 1) * 100);
-            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-        }
-        
-        // Update share URL
+        // Update the share URL with current audio and bookmarks
         function updateShareUrl() {
-            const bookmarksParam = bookmarks.length > 0 ? `&bookmarks=${encodeURIComponent(JSON.stringify(bookmarks))}` : '';
-            const audioParam = currentAudioUrl && !currentAudioUrl.startsWith('blob:') ? 
-                `&audio=${encodeURIComponent(currentAudioUrl)}` : '';
+            const shareUrl = document.getElementById('share-url');
+            const url = new URL(window.location.href);
             
-            if (!bookmarksParam && !audioParam) {
-                document.getElementById('share-url').value = '';
-                return;
+            // Clear existing parameters
+            url.search = '';
+            
+            // Add audio URL if available
+            if (currentAudioUrl) {
+                url.searchParams.set('audio', encodeURIComponent(currentAudioUrl));
             }
             
-            const url = `${window.location.origin}${window.location.pathname}?t=${Date.now()}${audioParam}${bookmarksParam}`;
-            document.getElementById('share-url').value = url;
+            // Add bookmarks if available
+            if (bookmarks.length > 0) {
+                url.searchParams.set('bookmarks', encodeURIComponent(JSON.stringify(bookmarks)));
+            }
+            
+            shareUrl.value = url.toString();
         }
         
-        // Load bookmarks and audio from URL
+        // Load audio and bookmarks from URL parameters
         function loadFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
-            const bookmarksParam = urlParams.get('bookmarks');
             const audioParam = urlParams.get('audio');
+            const bookmarksParam = urlParams.get('bookmarks');
             
             if (audioParam) {
-                // Switch to URL tab
-                document.querySelector('.tab[data-tab="url"]').click();
-                document.getElementById('url-input').value = decodeURIComponent(audioParam);
-                loadAudioFromUrl(decodeURIComponent(audioParam));
+                const audioUrl = decodeURIComponent(audioParam);
+                loadAudio(audioUrl, extractFilenameFromUrl(audioUrl));
             }
             
             if (bookmarksParam) {
                 try {
                     bookmarks = JSON.parse(decodeURIComponent(bookmarksParam));
-                    document.getElementById('bookmark-file-info').textContent = 
-                        `Loaded ${bookmarks.length} bookmarks from shared link`;
                 } catch (e) {
-                    console.error('Error parsing bookmarks from URL', e);
+                    console.error('Error parsing bookmarks from URL:', e);
                 }
+            }
+        }
+        
+        // Delete a bookmark by ID
+        function deleteBookmark(id) {
+            const index = bookmarks.findIndex(b => b.id === id);
+            if (index !== -1) {
+                bookmarks.splice(index, 1);
+                
+                // Reapply all bookmarks (easier than removing just one marker)
+                applyBookmarks();
+                updateShareUrl();
             }
         }
     </script>
