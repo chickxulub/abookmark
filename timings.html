@@ -878,3 +878,60 @@
                     deleteBookmark(id);
                 });
             });
+        }
+        
+        // Update the share URL with current audio and bookmarks
+        function updateShareUrl() {
+            const shareUrl = document.getElementById('share-url');
+            const url = new URL(window.location.href);
+            
+            // Clear existing parameters
+            url.search = '';
+            
+            // Add audio URL if available
+            if (currentAudioUrl) {
+                url.searchParams.set('audio', encodeURIComponent(currentAudioUrl));
+            }
+            
+            // Add bookmarks if available
+            if (bookmarks.length > 0) {
+                url.searchParams.set('bookmarks', encodeURIComponent(JSON.stringify(bookmarks)));
+            }
+            
+            shareUrl.value = url.toString();
+        }
+        
+        // Load audio and bookmarks from URL parameters
+        function loadFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const audioParam = urlParams.get('audio');
+            const bookmarksParam = urlParams.get('bookmarks');
+            
+            if (audioParam) {
+                const audioUrl = decodeURIComponent(audioParam);
+                loadAudio(audioUrl, extractFilenameFromUrl(audioUrl));
+            }
+            
+            if (bookmarksParam) {
+                try {
+                    bookmarks = JSON.parse(decodeURIComponent(bookmarksParam));
+                } catch (e) {
+                    console.error('Error parsing bookmarks from URL:', e);
+                }
+            }
+        }
+        
+        // Delete a bookmark by ID
+        function deleteBookmark(id) {
+            const index = bookmarks.findIndex(b => b.id === id);
+            if (index !== -1) {
+                bookmarks.splice(index, 1);
+                
+                // Reapply all bookmarks (easier than removing just one marker)
+                applyBookmarks();
+                updateShareUrl();
+            }
+        }
+    </script>
+</body>
+</html>
