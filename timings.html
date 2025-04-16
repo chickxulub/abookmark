@@ -459,6 +459,15 @@
                     document.getElementById('file-name').textContent = file.name;
                     currentAudioFileName = file.name;
                     const fileUrl = URL.createObjectURL(file);
+                    
+                    // Reset UI elements
+                    document.getElementById('loading').style.display = 'inline';
+                    document.getElementById('play-pause').disabled = true;
+                    document.getElementById('add-bookmark').disabled = true;
+                    
+                    // Clear any previous error messages
+                    document.getElementById('url-error').style.display = 'none';
+                    
                     loadAudio(fileUrl, file.name);
                 }
             });
@@ -730,11 +739,26 @@
                 bookmarks = [];
             }
             
-            // Load the audio file
-            wavesurfer.load(url);
-            
-            // Update the audio URL parameter
-            updateShareUrl();
+            try {
+                // Load the audio file
+                wavesurfer.load(url);
+                
+                // Handle loading errors
+                wavesurfer.on('error', function(err) {
+                    console.error('Error loading audio:', err);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('url-error').textContent = 'Error loading audio file. Please try another file.';
+                    document.getElementById('url-error').style.display = 'block';
+                });
+                
+                // Update the audio URL parameter
+                updateShareUrl();
+            } catch (error) {
+                console.error('Exception loading audio:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('url-error').textContent = 'Error loading audio file. Please try another file.';
+                document.getElementById('url-error').style.display = 'block';
+            }
         }
         
         // Apply bookmarks to the waveform
