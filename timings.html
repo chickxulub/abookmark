@@ -468,7 +468,14 @@
                     // Clear any previous error messages
                     document.getElementById('url-error').style.display = 'none';
                     
-                    loadAudio(fileUrl, file.name);
+                    // Check file type before loading
+                    if (file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|ogg|m4a|flac|aac)$/i)) {
+                        loadAudio(fileUrl, file.name);
+                    } else {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('url-error').textContent = 'Invalid file type. Please select an audio file.';
+                        document.getElementById('url-error').style.display = 'block';
+                    }
                 }
             });
             
@@ -740,16 +747,33 @@
             }
             
             try {
-                // Load the audio file
-                wavesurfer.load(url);
+                // Remove any previous error handlers to avoid duplicates
+                wavesurfer.un('error');
                 
-                // Handle loading errors
+                // Add error handler before loading
                 wavesurfer.on('error', function(err) {
                     console.error('Error loading audio:', err);
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('url-error').textContent = 'Error loading audio file. Please try another file.';
                     document.getElementById('url-error').style.display = 'block';
+                    
+                    // Re-enable buttons in case of error
+                    document.getElementById('play-pause').disabled = true;
+                    document.getElementById('add-bookmark').disabled = true;
                 });
+                
+                // Load the audio file with timeout
+                const loadTimeout = setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('url-error').textContent = 'Loading timed out. The file may be too large or unavailable.';
+                    document.getElementById('url-error').style.display = 'block';
+                }, 30000); // 30 second timeout
+                
+                wavesurfer.on('ready', function() {
+                    clearTimeout(loadTimeout);
+                });
+                
+                wavesurfer.load(url);
                 
                 // Update the audio URL parameter
                 updateShareUrl();
@@ -758,6 +782,10 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('url-error').textContent = 'Error loading audio file. Please try another file.';
                 document.getElementById('url-error').style.display = 'block';
+                
+                // Re-enable buttons in case of error
+                document.getElementById('play-pause').disabled = true;
+                document.getElementById('add-bookmark').disabled = true;
             }
         }
         
