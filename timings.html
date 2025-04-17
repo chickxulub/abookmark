@@ -238,6 +238,40 @@
             position: relative;
             top: 5px;
         }
+        
+        /* Zoom controls */
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        
+        .zoom-slider {
+            flex-grow: 1;
+            height: 5px;
+        }
+        
+        .zoom-button {
+            padding: 4px 8px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .zoom-button:hover {
+            background: #45a049;
+        }
+        
+        .zoom-level {
+            font-size: 12px;
+            color: #666;
+            min-width: 50px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -316,6 +350,13 @@
     <div id="waveform-container">
         <div id="waveform"></div>
         <div id="current-time-display">00:00.00 / 00:00.00</div>
+        <div class="zoom-controls">
+            <button class="zoom-button" id="zoom-out">-</button>
+            <input type="range" min="1" max="200" value="1" class="zoom-slider" id="zoom-slider">
+            <button class="zoom-button" id="zoom-in">+</button>
+            <span class="zoom-level" id="zoom-level">1x</span>
+            <button class="zoom-button" id="zoom-reset">Reset</button>
+        </div>
     </div>
     
     <div class="controls">
@@ -362,6 +403,7 @@
         let bookmarks = [];
         let currentAudioUrl = '';
         let currentAudioFileName = '';
+        let currentZoom = 1;
         
         // Format time as MM:SS.ms
         function formatTime(time) {
@@ -382,6 +424,8 @@
                 progressColor: '#2E7D32',
                 height: 100,
                 responsive: true,
+                minPxPerSec: 50, // Base zoom level (pixels per second)
+                scrollParent: true, // Enable horizontal scrolling when zoomed
                 plugins: [
                     WaveSurfer.markers.create({
                         markers: []
@@ -625,6 +669,31 @@
             
             // Trigger click on 'all' pill to initialize
             document.querySelector('.provider-pill[data-provider="all"]').click();
+            
+            // Zoom controls
+            document.getElementById('zoom-in').addEventListener('click', function() {
+                if (currentZoom < 200) {
+                    currentZoom = Math.min(200, currentZoom + 10);
+                    updateZoom();
+                }
+            });
+            
+            document.getElementById('zoom-out').addEventListener('click', function() {
+                if (currentZoom > 1) {
+                    currentZoom = Math.max(1, currentZoom - 10);
+                    updateZoom();
+                }
+            });
+            
+            document.getElementById('zoom-reset').addEventListener('click', function() {
+                currentZoom = 1;
+                updateZoom();
+            });
+            
+            document.getElementById('zoom-slider').addEventListener('input', function() {
+                currentZoom = parseInt(this.value);
+                updateZoom();
+            });
         });
         
         // Update time display
@@ -931,6 +1000,20 @@
                 applyBookmarks();
                 updateShareUrl();
             }
+        }
+        
+        // Update zoom level
+        function updateZoom() {
+            if (!wavesurfer || !wavesurfer.isReady) return;
+            
+            // Update zoom level display
+            document.getElementById('zoom-level').textContent = `${currentZoom}x`;
+            
+            // Update slider position
+            document.getElementById('zoom-slider').value = currentZoom;
+            
+            // Apply zoom to wavesurfer (50 is the base minPxPerSec)
+            wavesurfer.zoom(50 * currentZoom);
         }
     </script>
 </body>
