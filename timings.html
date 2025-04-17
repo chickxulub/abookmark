@@ -45,6 +45,16 @@
             z-index: 2;
             cursor: move;
         }
+        
+        #overview-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            position: relative;
+            z-index: 10;
+        }
         .controls {
             margin: 20px 0;
             display: flex;
@@ -236,6 +246,7 @@
         }
         #waveform-container {
             position: relative;
+            margin-bottom: 20px;
         }
         /* Cursor customization */
         .wavesurfer-cursor {
@@ -374,10 +385,11 @@
             <span class="zoom-level" id="zoom-level">1x</span>
             <button class="zoom-button" id="zoom-reset">Reset</button>
         </div>
-        <div id="overview-container">
-            <div id="overview-waveform"></div>
-            <div id="overview-region" class="overview-region"></div>
-        </div>
+    </div>
+    
+    <div id="overview-container">
+        <div id="overview-waveform"></div>
+        <div id="overview-region" class="overview-region"></div>
     </div>
     
     <div class="controls">
