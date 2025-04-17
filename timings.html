@@ -23,11 +23,27 @@
             margin-top: 25px;
             color: #444;
         }
-        #waveform {
-            margin: 20px 0;
+        #waveform, #overview-waveform {
             border: 1px solid #ddd;
             border-radius: 4px;
             position: relative;
+        }
+        #waveform {
+            margin-bottom: 10px;
+            height: 100px;
+        }
+        #overview-waveform {
+            height: 50px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        .overview-region {
+            position: absolute;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            z-index: 2;
+            cursor: move;
         }
         .controls {
             margin: 20px 0;
@@ -245,6 +261,7 @@
             align-items: center;
             gap: 10px;
             margin-top: 5px;
+            margin-bottom: 15px;
         }
         
         .zoom-slider {
@@ -357,6 +374,10 @@
             <span class="zoom-level" id="zoom-level">1x</span>
             <button class="zoom-button" id="zoom-reset">Reset</button>
         </div>
+        <div id="overview-container">
+            <div id="overview-waveform"></div>
+            <div id="overview-region" class="overview-region"></div>
+        </div>
     </div>
     
     <div class="controls">
@@ -400,10 +421,14 @@
 
     <script>
         let wavesurfer;
+        let overviewWavesurfer;
         let bookmarks = [];
         let currentAudioUrl = '';
         let currentAudioFileName = '';
         let currentZoom = 1;
+        let overviewRegion;
+        let isDraggingRegion = false;
+        let dragStartX = 0;
         
         // Format time as MM:SS.ms
         function formatTime(time) {
@@ -417,7 +442,7 @@
         
         // Initialize WaveSurfer
         document.addEventListener('DOMContentLoaded', function() {
-            // Create WaveSurfer instance
+            // Create main WaveSurfer instance (detail view)
             wavesurfer = WaveSurfer.create({
                 container: '#waveform',
                 waveColor: '#4CAF50',
@@ -447,6 +472,17 @@
                 ]
             });
             
+            // Create overview WaveSurfer instance
+            overviewWavesurfer = WaveSurfer.create({
+                container: '#overview-waveform',
+                waveColor: '#999',
+                progressColor: '#555',
+                height: 50,
+                responsive: true,
+                hideScrollbar: true,
+                interact: false // Disable user interaction with the overview
+            });
+            
             // Load bookmarks from URL parameters if any
             loadFromUrl();
             
@@ -463,6 +499,15 @@
                 
                 // Initialize time display
                 updateTimeDisplay(0, wavesurfer.getDuration());
+                
+                // Initialize overview region
+                updateOverviewRegion();
+            });
+            
+            // Sync overview with main waveform
+            overviewWavesurfer.on('ready', function() {
+                // Initialize the overview region
+                updateOverviewRegion();
             });
             
             // Update play/pause button text
@@ -477,11 +522,13 @@
             // Update time display during playback
             wavesurfer.on('audioprocess', function() {
                 updateTimeDisplay(wavesurfer.getCurrentTime(), wavesurfer.getDuration());
+                updateOverviewRegion();
             });
             
             // Update time display after seeking
             wavesurfer.on('seek', function() {
                 updateTimeDisplay(wavesurfer.getCurrentTime(), wavesurfer.getDuration());
+                updateOverviewRegion();
             });
             
             // Handle errors
@@ -694,6 +741,55 @@
                 currentZoom = parseInt(this.value);
                 updateZoom();
             });
+            
+            // Overview waveform click handler
+            document.getElementById('overview-waveform').addEventListener('click', function(e) {
+                if (!overviewWavesurfer.isReady) return;
+                
+                const rect = this.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const percent = x / rect.width;
+                
+                // Seek both waveforms
+                wavesurfer.seekTo(percent);
+                overviewWavesurfer.seekTo(percent);
+            });
+            
+            // Overview region drag handlers
+            document.getElementById('overview-region').addEventListener('mousedown', function(e) {
+                isDraggingRegion = true;
+                dragStartX = e.clientX;
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDraggingRegion) return;
+                
+                const overviewEl = document.getElementById('overview-waveform');
+                const rect = overviewEl.getBoundingClientRect();
+                const deltaX = e.clientX - dragStartX;
+                const percentDelta = deltaX / rect.width;
+                
+                if (percentDelta !== 0 && overviewWavesurfer.isReady) {
+                    // Calculate current position
+                    const currentPosition = wavesurfer.getCurrentTime() / wavesurfer.getDuration();
+                    
+                    // Calculate new position
+                    let newPosition = currentPosition + percentDelta;
+                    newPosition = Math.max(0, Math.min(1, newPosition));
+                    
+                    // Seek both waveforms
+                    wavesurfer.seekTo(newPosition);
+                    overviewWavesurfer.seekTo(newPosition);
+                    
+                    // Update drag start position
+                    dragStartX = e.clientX;
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isDraggingRegion = false;
+            });
         });
         
         // Update time display
@@ -818,6 +914,7 @@
             try {
                 // Remove any previous error handlers to avoid duplicates
                 wavesurfer.un('error');
+                overviewWavesurfer.un('error');
                 
                 // Add error handler before loading
                 wavesurfer.on('error', function(err) {
@@ -842,7 +939,9 @@
                     clearTimeout(loadTimeout);
                 });
                 
+                // Load audio in both waveforms
                 wavesurfer.load(url);
+                overviewWavesurfer.load(url);
                 
                 // Update the audio URL parameter
                 updateShareUrl();
@@ -1014,6 +1113,44 @@
             
             // Apply zoom to wavesurfer (50 is the base minPxPerSec)
             wavesurfer.zoom(50 * currentZoom);
+            
+            // Update the overview region to reflect the visible portion
+            updateOverviewRegion();
+        }
+        
+        // Update the overview region to show the visible portion of the waveform
+        function updateOverviewRegion() {
+            if (!wavesurfer || !wavesurfer.isReady || !overviewWavesurfer || !overviewWavesurfer.isReady) return;
+            
+            const overviewEl = document.getElementById('overview-waveform');
+            const regionEl = document.getElementById('overview-region');
+            
+            // Calculate the visible portion of the waveform
+            const totalWidth = overviewEl.clientWidth;
+            const duration = wavesurfer.getDuration();
+            const currentTime = wavesurfer.getCurrentTime();
+            
+            // Calculate the visible width based on zoom level
+            const visibleWidth = totalWidth / currentZoom;
+            
+            // Calculate the position based on current time
+            let position;
+            if (currentZoom === 1) {
+                // When fully zoomed out, show the entire region
+                position = 0;
+            } else {
+                // When zoomed in, center the region around the current time
+                const visibleDuration = duration / currentZoom;
+                const startTime = Math.max(0, currentTime - visibleDuration / 2);
+                position = (startTime / duration) * totalWidth;
+            }
+            
+            // Ensure the region stays within bounds
+            position = Math.max(0, Math.min(position, totalWidth - visibleWidth));
+            
+            // Update the region element
+            regionEl.style.width = `${visibleWidth}px`;
+            regionEl.style.left = `${position}px`;
         }
     </script>
 </body>
