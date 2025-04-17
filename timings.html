@@ -492,7 +492,16 @@
                 height: 50,
                 responsive: true,
                 hideScrollbar: true,
-                interact: false // Disable user interaction with the overview
+                interact: false, // Disable user interaction with the overview
+                plugins: [
+                    WaveSurfer.cursor.create({
+                        showTime: false,
+                        opacity: 1,
+                        customShowTimeStyle: {
+                            'display': 'none'
+                        }
+                    })
+                ]
             });
             
             // Load bookmarks from URL parameters if any
@@ -533,14 +542,35 @@
             
             // Update time display during playback
             wavesurfer.on('audioprocess', function() {
-                updateTimeDisplay(wavesurfer.getCurrentTime(), wavesurfer.getDuration());
+                const currentTime = wavesurfer.getCurrentTime();
+                updateTimeDisplay(currentTime, wavesurfer.getDuration());
                 updateOverviewRegion();
+                
+                // Sync overview progress
+                overviewWavesurfer.seekTo(currentTime / wavesurfer.getDuration());
             });
             
             // Update time display after seeking
-            wavesurfer.on('seek', function() {
-                updateTimeDisplay(wavesurfer.getCurrentTime(), wavesurfer.getDuration());
+            wavesurfer.on('seek', function(progress) {
+                const currentTime = wavesurfer.getCurrentTime();
+                updateTimeDisplay(currentTime, wavesurfer.getDuration());
                 updateOverviewRegion();
+                
+                // Sync overview progress
+                overviewWavesurfer.seekTo(progress);
+            });
+            
+            // Sync playback state between waveforms
+            wavesurfer.on('play', function() {
+                if (overviewWavesurfer.isPlaying() === false) {
+                    overviewWavesurfer.play();
+                }
+            });
+            
+            wavesurfer.on('pause', function() {
+                if (overviewWavesurfer.isPlaying() === true) {
+                    overviewWavesurfer.pause();
+                }
             });
             
             // Handle errors
@@ -765,6 +795,9 @@
                 // Seek both waveforms
                 wavesurfer.seekTo(percent);
                 overviewWavesurfer.seekTo(percent);
+                
+                // Update the overview region position
+                updateOverviewRegion();
             });
             
             // Overview region drag handlers
@@ -1145,16 +1178,37 @@
             // Calculate the visible width based on zoom level
             const visibleWidth = totalWidth / currentZoom;
             
-            // Calculate the position based on current time
+            // Calculate the position based on current time and scroll position
             let position;
+            
             if (currentZoom === 1) {
                 // When fully zoomed out, show the entire region
                 position = 0;
             } else {
-                // When zoomed in, center the region around the current time
+                // Get the scroll position from wavesurfer
+                const scrollLeft = wavesurfer.drawer.getScrollX();
+                const scrollWidth = wavesurfer.drawer.width;
+                const scrollRatio = scrollLeft / scrollWidth;
+                
+                // Calculate visible duration
                 const visibleDuration = duration / currentZoom;
-                const startTime = Math.max(0, currentTime - visibleDuration / 2);
+                
+                // Calculate start time based on scroll position
+                const startTime = scrollRatio * duration;
+                
+                // Convert to position in overview
                 position = (startTime / duration) * totalWidth;
+                
+                // Adjust if current time is not visible
+                if (currentTime < startTime || currentTime > startTime + visibleDuration) {
+                    // Center around current time instead
+                    const newStartTime = Math.max(0, currentTime - visibleDuration / 2);
+                    position = (newStartTime / duration) * totalWidth;
+                    
+                    // Update the scroll position of the main waveform
+                    const newScrollLeft = (newStartTime / duration) * scrollWidth;
+                    wavesurfer.drawer.recenter(currentTime / duration);
+                }
             }
             
             // Ensure the region stays within bounds
@@ -1163,6 +1217,10 @@
             // Update the region element
             regionEl.style.width = `${visibleWidth}px`;
             regionEl.style.left = `${position}px`;
+            
+            // Add a highlight effect to make the region more visible
+            regionEl.style.backgroundColor = 'rgba(76, 175, 80, 0.2)';
+            regionEl.style.borderColor = 'rgba(76, 175, 80, 0.5)';
         }
     </script>
 </body>
