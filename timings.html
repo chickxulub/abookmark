@@ -87,6 +87,13 @@
         #bookmarks {
             margin-top: 30px;
         }
+        #bookmarks-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
         .bookmark-item {
             display: flex;
             justify-content: space-between;
@@ -101,6 +108,19 @@
         .time {
             color: #666;
             min-width: 80px;
+            flex-shrink: 0;
+        }
+        .description {
+            flex-grow: 1;
+            margin: 0 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .bookmark-actions {
+            display: flex;
+            gap: 5px;
+            flex-shrink: 0;
         }
         .button-small {
             background: #f44336;
@@ -109,6 +129,39 @@
         }
         .button-small:hover {
             background: #d32f2f;
+        }
+        .edit-button {
+            background: #2196F3;
+        }
+        .edit-button:hover {
+            background: #0b7dda;
+        }
+        .edit-mode .description {
+            display: none;
+        }
+        .edit-input {
+            flex-grow: 1;
+            margin: 0 10px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        .edit-mode .edit-input {
+            display: block;
+        }
+        .save-button {
+            background: #4CAF50;
+            display: none;
+        }
+        .save-button:hover {
+            background: #45a049;
+        }
+        .edit-mode .save-button {
+            display: inline-block;
+        }
+        .edit-mode .edit-button {
+            display: none;
         }
         #share-section {
             margin-top: 30px;
@@ -1070,12 +1123,18 @@
                 bookmarkItem.innerHTML = `
                     <span class="time">${timeFormatted}</span>
                     <span class="description">${bookmark.description}</span>
-                    <button class="button-small" data-id="${bookmark.id}">Delete</button>
+                    <input type="text" class="edit-input" value="${bookmark.description}">
+                    <div class="bookmark-actions">
+                        <button class="button-small edit-button" data-id="${bookmark.id}">Edit</button>
+                        <button class="button-small save-button" data-id="${bookmark.id}">Save</button>
+                        <button class="button-small" data-id="${bookmark.id}">Delete</button>
+                    </div>
                 `;
                 
-                // Jump to time when clicking on bookmark
+                // Jump to time when clicking on bookmark (but not on buttons or input)
                 bookmarkItem.addEventListener('click', function(e) {
-                    if (!e.target.classList.contains('button-small')) {
+                    if (!e.target.classList.contains('button-small') && 
+                        !e.target.classList.contains('edit-input')) {
                         wavesurfer.seekTo(bookmark.time / wavesurfer.getDuration());
                     }
                 });
@@ -1084,11 +1143,58 @@
             });
             
             // Add delete event listeners
-            document.querySelectorAll('.button-small').forEach(btn => {
+            document.querySelectorAll('.button-small:not(.edit-button):not(.save-button)').forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const id = this.getAttribute('data-id');
                     deleteBookmark(id);
+                });
+            });
+            
+            // Add edit event listeners
+            document.querySelectorAll('.edit-button').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const bookmarkItem = this.closest('.bookmark-item');
+                    bookmarkItem.classList.add('edit-mode');
+                    const input = bookmarkItem.querySelector('.edit-input');
+                    input.focus();
+                });
+            });
+            
+            // Add save event listeners
+            document.querySelectorAll('.save-button').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const id = this.getAttribute('data-id');
+                    const bookmarkItem = this.closest('.bookmark-item');
+                    const newDescription = bookmarkItem.querySelector('.edit-input').value;
+                    updateBookmarkDescription(id, newDescription);
+                    bookmarkItem.classList.remove('edit-mode');
+                });
+            });
+            
+            // Add event listener for pressing Enter in edit input
+            document.querySelectorAll('.edit-input').forEach(input => {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const bookmarkItem = this.closest('.bookmark-item');
+                        const id = bookmarkItem.querySelector('.save-button').getAttribute('data-id');
+                        updateBookmarkDescription(id, this.value);
+                        bookmarkItem.classList.remove('edit-mode');
+                    }
+                });
+                
+                // Close edit mode when clicking outside
+                input.addEventListener('blur', function() {
+                    setTimeout(() => {
+                        // Small timeout to allow save button click to register first
+                        const bookmarkItem = this.closest('.bookmark-item');
+                        if (bookmarkItem && bookmarkItem.classList.contains('edit-mode')) {
+                            bookmarkItem.classList.remove('edit-mode');
+                        }
+                    }, 200);
                 });
             });
         }
@@ -1142,6 +1248,26 @@
                 
                 // Reapply all bookmarks (easier than removing just one marker)
                 applyBookmarks();
+                updateShareUrl();
+            }
+        }
+        
+        // Update a bookmark's description
+        function updateBookmarkDescription(id, newDescription) {
+            const index = bookmarks.findIndex(b => b.id === id);
+            if (index !== -1) {
+                bookmarks[index].description = newDescription;
+                
+                // Update the marker label
+                wavesurfer.markers.update([{
+                    time: bookmarks[index].time,
+                    label: newDescription,
+                    color: '#ff0000',
+                    position: 'top'
+                }]);
+                
+                // Update the bookmarks list and share URL
+                updateBookmarksList();
                 updateShareUrl();
             }
         }
